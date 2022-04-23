@@ -1,0 +1,8 @@
+{
+  "verbose": true,
+  "ignore": [],
+  "watch": ["src/**/*.ts"],
+  "execMap": {
+    "ts": "node --inspect=127.0.0.1:9229 --nolazy -r ts-node/register"
+  }
+}
