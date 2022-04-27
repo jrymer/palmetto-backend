@@ -1,65 +1,41 @@
-import express from "express";
-
-const seattle = {
-  coord: {
-    lon: -122.3321,
-    lat: 47.6062,
-  },
-  weather: [
-    {
-      id: 804,
-      main: "Clouds",
-      description: "overcast clouds",
-      icon: "04d",
-    },
-  ],
-  base: "stations",
-  main: {
-    temp: 282.87,
-    feels_like: 281,
-    temp_min: 280.75,
-    temp_max: 285.55,
-    pressure: 1027,
-    humidity: 79,
-  },
-  visibility: 10000,
-  wind: {
-    speed: 3.6,
-    deg: 190,
-  },
-  clouds: {
-    all: 100,
-  },
-  dt: 1650731651,
-  sys: {
-    type: 2,
-    id: 2004026,
-    country: "US",
-    sunrise: 1650719123,
-    sunset: 1650769769,
-  },
-  timezone: -25200,
-  id: 5809844,
-  name: "Seattle",
-  cod: 200,
-};
+import express from 'express';
+import { ResponsePayload, Units } from 'types';
+import cors from 'cors';
+import { formatPayload, isErrorResponse } from './utility';
 
 const app = express();
+app.use(cors());
 
-app.listen(4000, () => {
+// Export to use in tests
+export const server = app.listen(4000, () => {
   console.log(`server running on port 4000`);
 });
 
-app.get("/", (req, res) => {
-  res.send("Hello");
+// Simple endpoint to verify server is running
+app.get('/', (_, res) => {
+  res.send('Running');
 });
 
-app.get("/search", async (req, res) => {
-  const { city } = req.query;
-  const url = `https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${process.env.OPEN_WEATHER_API_KEY}`;
-  // const response = await fetch(url);
-  // const data = await response.json();
-  res.send(seattle);
-});
+// Main search endpoint, accepts a city, lat and lon, and units. Takes that information and searches
+// the OWM API and returns a weather response
+app.get(
+  '/search',
+  async (req: { query: { city: string; lat: number; lon: number; units: Units } }, res) => {
+    const { city, lat, lon, units } = req.query;
+    let url: string = '';
+    if (city) {
+      url = `https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${process.env.OPEN_WEATHER_API_KEY}&units=${units}`;
+    } else if (lat && lon) {
+      url = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${process.env.OPEN_WEATHER_API_KEY}&units=${units}`;
+    }
+    const response = await fetch(url);
+    const data: ResponsePayload = await response.json();
 
-// https://dev.to/dariansampare/setting-up-docker-typescript-node-hot-reloading-code-changes-in-a-running-container-2b2f
+    if (isErrorResponse(data)) {
+      res.status(Number(data.cod)).send(data.message);
+    } else {
+      const formatted = formatPayload(data, units);
+      res.send(formatted);
+    }
+  }
+);
